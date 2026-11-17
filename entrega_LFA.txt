@@ -1,0 +1,228 @@
+﻿================================================================================
+GERADOR DE AUTÔMATOS FINITOS DETERMINÍSTICOS A PARTIR DE TOKENS E GRAMÁTICAS
+REGULARES
+================================================================================
+
+Autores: Wictor Henrique Greselli
+         João Gabriel Chaves
+Instituição: Universidade Federal da Fronteira Sul (UFFS)
+Disciplina: Linguagens Formais e Autômatos
+Conteúdo deste arquivo: (1) Relatório em formato de artigo; (2) Código-fonte.
+
+--------------------------------------------------------------------------------
+RESUMO
+--------------------------------------------------------------------------------
+Este trabalho apresenta uma aplicação que recebe um conjunto de tokens
+(palavras reservadas) e de gramáticas regulares (GRs) escritas em BNF e produz
+o autômato finito determinístico (AFD) mínimo e completo que reconhece a união
+das linguagens descritas. O processo segue as etapas: construção de um
+autômato finito não determinístico (AFND) com transições ε, determinização
+pela construção dos subconjuntos, remoção de estados inalcançáveis e mortos,
+minimização pelo algoritmo de Brzozowski (sem classes de equivalência) e
+inclusão de um estado de erro. A aplicação possui interface gráfica, que exibe
+a tabela de transições de cada etapa, e interface de linha de comando. Os
+resultados mostram que o método gera autômatos corretos e mínimos para
+entradas com tokens e GRs lineares à direita e à esquerda.
+
+Palavras-chave: autômatos finitos, gramáticas regulares, determinização,
+minimização, algoritmo de Brzozowski.
+
+--------------------------------------------------------------------------------
+1. INTRODUÇÃO
+--------------------------------------------------------------------------------
+Analisadores léxicos reconhecem os elementos básicos de uma linguagem
+(identificadores, palavras reservadas, números) e, na prática, são
+implementados como autômatos finitos determinísticos. Construir esses
+autômatos à mão é trabalhoso e sujeito a erros, sobretudo quando vários
+tokens e gramáticas precisam ser combinados em um único reconhecedor.
+
+O objetivo deste trabalho é implementar um gerador que, dado um arquivo com
+tokens e gramáticas regulares em BNF, produza automaticamente o AFD mínimo
+correspondente, apresentando a tabela de transições. A solução foi escrita em
+Python, sem bibliotecas externas além da biblioteca padrão (Tkinter para a
+interface gráfica).
+
+O restante do artigo está organizado assim: a Seção 2 revisa os conceitos
+necessários e trabalhos correlatos; a Seção 3 descreve a especificação e a
+implementação; a Seção 4 traz a conclusão.
+
+--------------------------------------------------------------------------------
+2. REFERENCIAL TEÓRICO
+--------------------------------------------------------------------------------
+2.1 Linguagens regulares e autômatos finitos
+Um alfabeto Σ é um conjunto finito de símbolos; uma linguagem é um conjunto
+de cadeias sobre Σ. As linguagens regulares são aquelas reconhecidas por
+autômatos finitos, descritas por expressões regulares ou geradas por
+gramáticas regulares (HOPCROFT; MOTWANI; ULLMAN, 2002).
+
+Um autômato finito é uma quíntupla M = (Q, Σ, δ, q0, F), em que Q é o conjunto
+de estados, Σ o alfabeto, δ a função de transição, q0 ∈ Q o estado inicial e
+F ⊆ Q o conjunto de estados finais. No AFD, δ: Q × Σ → Q. No AFND,
+δ: Q × (Σ ∪ {ε}) → P(Q), isto é, cada par pode levar a vários estados e
+são permitidas transições vazias (ε). Ambos os modelos reconhecem exatamente
+a mesma classe de linguagens (SIPSER, 2007).
+
+2.2 Gramáticas regulares e BNF
+Uma gramática regular (GR) é linear à direita quando suas produções têm a
+forma A → wB ou A → w, e linear à esquerda quando têm a forma A → Bw ou
+A → w, com w uma cadeia de terminais. A BNF (Backus-Naur Form) é uma notação
+para escrever gramáticas: variáveis aparecem entre "<" e ">", a produção usa
+"::=" e as alternativas são separadas por "|". Neste trabalho, ε representa a
+cadeia vazia.
+
+2.3 Conversão de GR para AFND
+Em uma GR linear à direita, cada variável torna-se um estado; uma produção
+A → aB gera a transição δ(A, a) ∋ B; produções A → a levam a um estado final;
+e A → ε torna A final. Em GRs lineares à esquerda, a leitura é invertida: a
+variável inicial passa a ser estado final e as produções sem variável partem
+do estado inicial global.
+
+2.4 Determinização
+A construção dos subconjuntos transforma um AFND em AFD: cada estado do AFD
+corresponde a um conjunto de estados do AFND. O ε-fecho de um conjunto S é o
+conjunto de estados alcançáveis a partir de S usando apenas transições ε. O
+estado inicial do AFD é o ε-fecho de q0; para um símbolo a, o destino de um
+conjunto S é o ε-fecho de move(S, a); e um conjunto é final se contém algum
+estado final do AFND (HOPCROFT; MOTWANI; ULLMAN, 2002).
+
+2.5 Estados inúteis e estado de erro
+Um estado é inalcançável se nenhuma cadeia leva a ele a partir do estado
+inicial, e é morto se dele não se alcança nenhum estado final. Ambos são
+removidos. Para que a função de transição seja total, as transições
+indefinidas são direcionadas a um estado de erro, não final, que só transita
+para si mesmo.
+
+2.6 Minimização por Brzozowski
+O algoritmo clássico de minimização constrói classes de equivalência entre
+estados. Brzozowski (1962) propôs uma alternativa: reverter o autômato e
+determinizá-lo, e repetir esse par de operações uma segunda vez. O resultado
+é o AFD mínimo, sem o uso de partições de estados equivalentes. O autômato
+reverso inverte todas as transições e troca os papéis de estado inicial e
+estados finais (com um novo início ligado por transições ε aos finais antigos,
+quando há mais de um).
+
+2.7 Trabalhos correlatos
+Ferramentas como Lex e Flex (AHO et al., 2007) geram analisadores léxicos a
+partir de expressões regulares, construindo internamente AFNDs, AFDs e
+aplicando minimização. O simulador JFLAP também permite converter gramáticas
+regulares em autômatos, determinizar e minimizar de forma visual. Diferente
+dessas, a presente aplicação aceita diretamente tokens e GRs em BNF e
+emprega Brzozowski na minimização.
+
+--------------------------------------------------------------------------------
+3. ESPECIFICAÇÃO E IMPLEMENTAÇÃO DA SOLUÇÃO
+--------------------------------------------------------------------------------
+3.1 Formato da entrada
+- Uma linha comum é um token (por exemplo: se).
+- Linhas no formato <A> ::= alternativas formam uma GR; a primeira variável
+  é o símbolo inicial.
+- Uma linha em branco separa uma GR da seguinte.
+- Cada alternativa pode ter no máximo uma variável, no início ou no fim;
+  não se mistura orientação esquerda e direita na mesma GR.
+
+Exemplo:
+    se
+    entao
+    senao
+
+    <S> ::= a<A> | e<A> | i<A> | o<A> | u<A>
+    <A> ::= a<A> | e<A> | i<A> | o<A> | u<A> | ε
+
+3.2 Arquitetura
+O código foi organizado em um pacote Python (afd/) com um módulo por etapa:
+
+    automato.py    Estrutura FiniteAutomaton (Q, Σ, δ, q0, F).
+    analisador.py  Leitura e validação de tokens e GRs em BNF.
+    carregador.py  Conversão de tokens e GRs para um único AFND.
+    algoritmos.py  ε-fecho, determinização, remoção de inúteis,
+                   reversão, minimização de Brzozowski e estado de erro.
+    pipeline.py    Encadeia todas as etapas (generate_steps).
+    formatacao.py  Geração das tabelas de transição.
+    gui.py         Interface gráfica (Tkinter).
+    cli.py         Interface de linha de comando.
+    main.py        Ponto de entrada.
+
+3.3 Etapas do algoritmo
+1) Leitura: o texto é separado em tokens e blocos de GR; cada GR é validada
+   (regularidade e orientação).
+2) Construção do AFND: todos os tokens e GRs compartilham o estado inicial
+   q0. Cada token vira uma cadeia de estados terminando em um estado final.
+   Cada GR vira estados por variável, conforme a Seção 2.3. Se a variável
+   inicial de uma GR aparece do lado direito de alguma produção, cria-se uma
+   cópia privada ligada a q0 por uma transição ε, evitando que o ciclo da GR
+   se misture com outros tokens. Produções unitárias (<A> ::= <B>) viram
+   transições ε.
+3) Determinização: construção dos subconjuntos com ε-fecho, usando fila.
+   Transições sem destino são omitidas nesta etapa.
+4) Remoção de estados inúteis: busca a partir do estado inicial (alcançáveis)
+   e busca nas arestas invertidas a partir dos finais (vivos); mantêm-se os
+   estados que são ao mesmo tempo alcançáveis e vivos.
+5) Minimização: aplica-se duas vezes "reverter e determinizar"
+   (Brzozowski) e remove-se novamente estados inúteis.
+6) Estado de erro: toda transição ausente é direcionada ao estado ERRO, não
+   final, que possui laços para todo símbolo do alfabeto.
+
+3.4 Interfaces
+A interface gráfica possui uma área de texto para a entrada e quatro abas com
+as tabelas: 1) AFND, 2) AFD determinizado, 3) AFD mínimo e 4) AFD final com
+ERRO. Nas tabelas, "→" indica o estado inicial e "*" os estados finais. A
+tabela final pode ser salva em arquivo .txt. Pela linha de comando:
+
+    python main.py --gui
+    python main.py entrada.txt
+    python main.py entrada.txt -o saida.txt
+    python main.py entrada.txt --etapas
+
+3.5 Exemplo de execução
+Entrada (GR linear à direita, cadeias com número par de "a" sobre {a, b}):
+
+    <S> ::= a<B> | b<S> | ε
+    <B> ::= a<S> | b<B>
+
+Saída (AFD final):
+
+    Estado | Final | a    | b
+    ->D0   | Sim   | D1   | D2
+      D1   | Não   | D2   | D1
+      D2   | Sim   | D1   | D2
+      ERRO | Não   | ERRO | ERRO
+
+O AFND de carga possuía 3 estados, e o AFD determinizado e o mínimo
+resultaram com 3 estados (mais o ERRO na versão final); o autômato já estava
+mínimo, o que o algoritmo de Brzozowski confirmou.
+
+--------------------------------------------------------------------------------
+4. CONCLUSÃO
+--------------------------------------------------------------------------------
+Foi desenvolvida uma aplicação que gera o AFD mínimo e completo a partir de
+tokens e gramáticas regulares em BNF, cobrindo todo o fluxo: AFND,
+determinização, remoção de estados inúteis, minimização por Brzozowski e
+inclusão do estado de erro. A visualização por etapas facilita o estudo e a
+verificação dos resultados. A organização modular do código torna cada
+algoritmo isolado e fácil de ler. Como trabalhos futuros, pode-se incluir
+expressões regulares como entrada, suporte a classes de caracteres e a
+exportação do autômato em formatos gráficos.
+
+--------------------------------------------------------------------------------
+REFERÊNCIAS
+--------------------------------------------------------------------------------
+AHO, A. V.; LAM, M. S.; SETHI, R.; ULLMAN, J. D. Compiladores: princípios,
+técnicas e ferramentas. 2. ed. São Paulo: Pearson, 2007.
+
+BRZOZOWSKI, J. A. Canonical regular expressions and minimal state graphs for
+definite events. In: Mathematical Theory of Automata. Brooklyn: Polytechnic
+Press, 1962. p. 529-561.
+
+HOPCROFT, J. E.; MOTWANI, R.; ULLMAN, J. D. Introdução à teoria de autômatos,
+linguagens e computação. Rio de Janeiro: Campus, 2002.
+
+MENEZES, P. B. Linguagens formais e autômatos. 6. ed. Porto Alegre: Bookman,
+2011.
+
+SIPSER, M. Introdução à teoria da computação. 2. ed. São Paulo: Thomson
+Learning, 2007.
+
+================================================================================
+CÓDIGO-FONTE DA APLICAÇÃO
+================================================================================
+Repositório Git: https://github.com/ROCKzYyN/LFA-TrabFinal
